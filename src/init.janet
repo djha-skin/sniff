@@ -11,7 +11,6 @@
 (test (system-config-path "goose" :macos) "/Library/Preferences/goose/config.nrdl")
 (test (system-config-path "goose" :windows) "C:\\ProgramData\\goose\\config.nrdl")
 
-
 (defn home-config-path [program-name env which]
   (match which
     :windows (let [local-app-data (env "LOCALAPPDATA")]
@@ -53,38 +52,75 @@
 (test (home-config-path "foo" {"USERPROFILE" "C:\\Users\\foo\\AppData\\Local"} :windows) "C:\\Users\\foo\\AppData\\Local\\AppData\\Local\\foo\\config.nrdl")
 
 # TODO This is _all kinds_ of messed up
-#(defn from-environment [program-name env which
-#  (let [b ~{
-#            :und "_"
-#            :name ,(string/ascii-upper program-name)
-#            :option (replace (capture (any (range "az" "AZ"))) ,string/ascii-lower)
-#            :main (sequence :name :und :option)
-#            }
-#        results @{}]
-#    (loop [[var val] :pairs env]
-#      (put results (keyword option)
-#           (nrdl/parse-from val)))))
-#
-#(defn from-cli [program-name cli]
-#  (def i 0)
-#  (def subcommands @[])
-#  (def options @{})
-#  (while (< i (length cli))
-#    (let [term (get cli i)]
-#      (cond
-#        (< (length term) 1) (array/push subcommands term)
-#        (= (string/slice term 0 1) "-")
-#        (let [opt (string/slice term 1)]
-#          (++ i)
-#          (if (= i (length cli))
-#            (error (string/format
-#                     "Given option `%s` but no value for it"
-#                     opt))
-#            (put options (keyword opt) (nrdl/parse-from (get cli i)))))
-#        (array/push subcommands term)))
-#    (++ i))
-#  [options subcommands])
-#
+(defn from-environment [program-name env]
+  (let [b ~{
+            :und "_"
+            :name ,(string/ascii-upper program-name)
+            :option (replace (capture (any (range "az" "AZ"))) ,string/ascii-lower)
+            :main (sequence :name :und :option)
+            }
+        results @{}]
+    (loop [[var val] :pairs env]
+      (let [matches (peg/match b var)]
+        (when matches
+          (loop [mtch :in matches]
+            (put results (keyword mtch) (nrdl/parse-from val))))))
+    results))
+
+(deftest from-environment-typical
+  (test (from-environment "fydo"
+                        {
+                         "FYDO_NUMBER" "1"
+                         "FYDO_STRING" "\"butwhy\""
+                         "FYDO_SYMBOL" "barf"
+                         "FYDO_BOOL" "true"
+                         "FYDO_MAP" "{:a 1 :b 2 :c 3}"
+                         "FYDO_LIST" "[4 5 6]"
+                         "ACHE" "bake"})
+    @{:bool true
+      :list @[4 5 6]
+      :map @{:a 1 :b 2 :c 3}
+      :number 1
+      :string "butwhy"
+      :symbol :barf}))
+
+# Stuff shouldn't work if it's not upper case
+(deftest from-environment-wrongcase
+  (test (from-environment "fydo"
+                        {
+                         "fydo_NUMBER" "1"
+                         "fydo_STRING" "\"butwhy\""
+                         "fydo_SYMBOL" "barf"
+                         "fydo_BOOL" "true"
+                         "fydo_MAP" "{:a 1 :b 2 :c 3}"
+                         "fydo_LIST" "[4 5 6]"
+                         "acHe" "bake"})
+    @{}))
+
+# Stuff shouldn't work if there's no environment
+(deftest from-environment-empty
+  (test (from-environment "fydo" {}) @{}))
+
+(defn from-cli [program-name cli]
+  (def i 0)
+  (def subcommands @[])
+  (def options @{})
+  (while (< i (length cli))
+    (let [term (get cli i)]
+      (cond
+        (< (length term) 1) (array/push subcommands term)
+        (= (string/slice term 0 1) "-")
+        (let [opt (string/slice term 1)]
+          (++ i)
+          (if (= i (length cli))
+            (error (string/format
+                     "Given option `%s` but no value for it"
+                     opt))
+            (put options (keyword opt) (nrdl/parse-from (get cli i)))))
+        (array/push subcommands term)))
+    (++ i))
+  [options subcommands])
+
 #(defn resolve-expansions [cli aliases]
 #  (def resultant-cli @[])
 #  (loop [term :in cli]
