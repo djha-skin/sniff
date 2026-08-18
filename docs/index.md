@@ -1,5 +1,7 @@
 # sniff
 
+![sniff](assets/sniff.png)
+
 sniff gathers a program's options from configuration files, the
 environment, and the command line into a single table — an
 "options tower". Instead of writing the same configuration-loading

@@ -1,5 +1,7 @@
 # sniff
 
+![sniff logo](docs/assets/sniff.png)
+
 Do you want your Janet program to look at configuration files, the
 environment, and the command line to get its options, without
 having to *code* any of that stuff? Feel bogged down writing the
