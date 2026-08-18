@@ -49,12 +49,12 @@
 
 (defn from-cli [cli]
   (var i 0)
-  (def subcommands @[])
+  (def arguments @[])
   (def options @{})
   (while (< i (length cli))
     (let [term (get cli i)]
       (cond
-        (< (length term) 6) (array/push subcommands term)
+        (< (length term) 6) (array/push arguments term)
         (= (string/slice term 0 6) "--set-")
         (let [opt (string/slice term 6)]
           (++ i)
@@ -63,9 +63,9 @@
                      "Given option `%s` but no value for it"
                      opt))
             (put options (keyword opt) (nrdl/parse-from (get cli i)))))
-        (array/push subcommands term)))
+        (array/push arguments term)))
     (++ i))
-  [options subcommands])
+  [options arguments])
 
 (defn resolve-expansions [expansions cli]
   (def resultant-cli @[])
